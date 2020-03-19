@@ -1,0 +1,164 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "authType": {
+            "type": "string",
+            "defaultValue": "password",
+            "allowedValues": [
+                "password",
+                "sshPublicKey"
+            ],
+            "metadata": {
+                "description": "Type of authentication to use on the virtual machine."
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "User name for the Virtual Machine."
+            }
+        },
+        "adminPasswordOrKey": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password or ssh key for the Virtual Machine"
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "metadata": {
+                "description": "Size of the Virtual Machine."
+            }
+        },
+        "vmStoragePerformance": {
+            "type": "string",
+            "metadata": {
+                "description": "Storage performance level for the Virtual Machine."
+            }
+        },
+        "nicName": {
+            "type": "string",
+            "metadata": {
+                "description": "Network interface card name for the Virtual Machine."
+            }
+        },
+        "subnetRef": {
+            "type": "string",
+            "metadata": {
+                "description": "Reference to the subnet that the network interface will be joined to."
+            }
+        },
+        "publicIpName": {
+            "type": "string",
+            "metadata": {
+                "description": "The public IP address name"
+            }
+        },
+        "ubuntuImage": {
+            "type": "object",
+            "metadata": {
+                "description": "Ubuntu operating system version for the Virtual Machine."
+            }
+        },
+        "dnsName": {
+            "type": "string",
+            "metadata": {
+                "description": "DNS name (prefix) of the Virtual Machine."
+            }
+        },
+        "nsgName": {
+            "type": "string",
+            "metadata": {
+                "description": "Network security group name"
+            }
+        },
+        "location": {
+            "type": "string",
+            "metadata": {
+                "description": "Location for the resources."
+            }
+        }
+    },
+    "variables": {
+        "apiVersionVirtualMachine": "2019-07-01",
+        "apiVersionNetworkInterfaces": "2019-11-01",
+        "sshKeyPath": "[concat('/home/',parameters('adminUsername'),'/.ssh/authorized_keys')]",
+        "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+                "publicKeys": [
+                    {
+                        "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
+                        "keyData": "[parameters('adminPasswordOrKey')]"
+                    }
+                ]
+            }
+        },
+        "nsgId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsgName'))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "[variables('apiVersionNetworkInterfaces')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('nicName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIpAddress": {
+                                "id": "[resourceid('Microsoft.Network/publicIpAddresses', parameters('publicIpName'))]"
+                            },
+                            "subnet": {
+                                "id": "[parameters('subnetRef')]"
+                            },
+                            "primary": true
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[variables('nsgId')]"
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionVirtualMachine')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('dnsName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('nicName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('dnsName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPasswordOrKey')]",
+                    "linuxConfiguration": "[if(equals(parameters('authType'), 'password'), json('null'), variables('linuxConfiguration'))]"
+                },
+                "storageProfile": {
+                    "imageReference": "[parameters('ubuntuImage')]",
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[concat(parameters('vmStoragePerformance'), '_LRS')]"
+                        }
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nicName'))]"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

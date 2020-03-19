@@ -1,0 +1,46 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "adminUsername": {
+            "type": "string"
+        },
+        "dnsName": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "artifactsLocationUrl": {
+            "type": "string"
+        },
+        "artifactsLocationUrlSasToken": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "apiVersionVirtualMachinesExtensions": "2019-07-01"
+    },
+    "resources": [
+        {
+            "apiVersion": "[variables('apiVersionVirtualMachinesExtensions')]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(parameters('dnsName'), '/newuserscript')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "publisher": "Microsoft.Azure.Extensions",
+                "type": "CustomScript",
+                "typeHandlerVersion": "2.0",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "fileUris": [
+                        "[uri(parameters('artifactsLocationUrl'), concat('scripts/config.sh', parameters('artifactsLocationUrlSasToken')))]"
+                    ]
+                },
+                "protectedSettings": {
+                    "commandToExecute": "[concat('/bin/bash config.sh \"', parameters('adminUsername'), '\" \"', parameters('artifactsLocationUrl'), '\" \"', parameters('artifactsLocationUrlSasToken'), '\" \"', parameters('dnsName'), '\"')]"
+                }
+            }
+        }
+    ]
+}
